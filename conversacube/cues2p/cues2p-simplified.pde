@@ -1,25 +1,24 @@
 #include <SoftwareSerial.h>
 
-static String cues[60] = {    
-  "0confront", "1admit", "0compliment", "0roll eyes", "0empathize", "0look away", 
-  "0reveal", "1chime in", "0digress", "1confide", "0forget", "0wink", "0insult", "1relate to", "0confess", 
-  "1joke", "0brag", "1care", "0challenge", "0maintain eye contact", "0reminisce", "1interrupt", "0praise", 
-  "0raise eyebrows", "0suggest", "1laugh", "0give advice", "1contradict", "0aggravate", "0nod", "0compare", 
-  "1criticize", "0commiserate", "1frown", "0wish", "1accuse", "0make fun", "1agree", "0offer", "1consider",
-  "0dismiss", "0smile", "0change topic", "1listen", "0lie", "1disagree", "0complain", "0touch", "0plan",
-  "1challenge", "0argue", "exaggerate", "0predict", "0shake head", "0question", "1defend", "0share", "1debate",
-  "0change subject", "1notice"
+static String cues[60] = {
+  "confront", "admit", "compliment", "roll eyes", "empathize", "look away",
+  "reveal", "chime in", "digress", "confide", "forget", "wink", "insult", "relate to", "confess",
+  "joke", "brag", "care", "challenge", "maintain eye contact", "reminisce", "interrupt", "praise",
+  "raise eyebrows", "suggest", "laugh", "give advice", "contradict", "aggravate", "nod", "compare",
+  "criticize", "commiserate", "frown", "wish", "accuse", "make fun", "agree", "offer", "consider",
+  "dismiss", "smile", "change topic", "listen", "lie", "disagree", "complain", "touch", "plan",
+  "challenge", "argue", "exaggerate", "predict", "shake head", "question", "defend", "share", "debate",
+  "change subject", "notice"
 };
 
 int time = 0;
 int cur_cue = -1;
-int cur_set = 0;
-boolean flip;
+int cue_interval = 1000; // 1 per second to test
+boolean cur_user = 0;
 
-char cue0_chars[34];
-char cue1_chars[34];
+char cue_chars[34];
 
-SoftwareSerial mySerial = SoftwareSerial(0, 1);
+SoftwareSerial mySerial0 = SoftwareSerial(0, 1);
 SoftwareSerial mySerial1 = SoftwareSerial(3, 2);
 
 void setup() {
@@ -28,52 +27,43 @@ void setup() {
   pinMode(2, OUTPUT);
   pinMode(8, OUTPUT);
 
-  mySerial.begin(9600);
+  mySerial0.begin(9600);
   mySerial1.begin(9600);
+  // Serial.begin(9600);
   digitalWrite(8, HIGH);
 }
 
 void loop() {
-  if (time >= 2000 * 2 + 10) { // change this number for reset time needed // cue time
-    cur_set = random(30); //max cues
-    flip = random(2);
+  if (cur_cue == -1 || time >= cue_interval / 10) {
     time = 0;
-    cur_cue = -1;
-  }
-
-  if (time >= (cur_cue+1) * 2000) { //cue time
-    cur_cue++;
+    pickCue();
     handleCueOut();
   }
+
   time++;
   delay(10);
 }
 
+void pickCue() {
+  cur_cue = random(60);
+  // Serial.println(cur_cue);
+  cur_user = !cur_user;
+}
 
 void handleCueOut() {
-  if (cur_cue >= 2) {  
-    mySerial.print(0xFE, BYTE);
-    mySerial.print(0x01, BYTE);  
-    mySerial1.print(0xFE, BYTE);
-    mySerial1.print(0x01, BYTE);
-  } 
-  else {
-    
-  //mySerial.print(cur_set);
-  //mySerial.print("/");
-  //mySerial.println(get_free_memory());
-    if (cues[2*cur_set].charAt(0)-48 == cur_cue) {
-      remixCue(cues[2*cur_set]).toCharArray(cue0_chars, sizeof(cue0_chars));
-      if (flip == 1) mySerial1.print(cue0_chars);
-      else mySerial.print(cue0_chars);
-    }
-    if (cues[2*cur_set+1].charAt(0)-48 == cur_cue) {
-      remixCue(cues[2*cur_set+1]).toCharArray(cue1_chars, sizeof(cue1_chars)); 
-      if (flip == 1) mySerial.print(cue1_chars);
-      else mySerial1.print(cue1_chars);  
-    }
 
-  }
+  // clear both screens
+  mySerial0.print(0xFE, BYTE);
+  mySerial0.print(0x01, BYTE);
+  mySerial1.print(0xFE, BYTE);
+  mySerial1.print(0x01, BYTE);
+
+  // prepare cue
+  remixCue(cues[cur_cue]).toCharArray(cue_chars, sizeof(cue_chars));
+
+  // print cue
+  if (cur_user) mySerial0.print(cue_chars);
+  else mySerial1.print(cue_chars);
 }
 
 String werd = String(34);
@@ -84,39 +74,41 @@ String remixCue(String c) {
   db = false;
   werd = "";
   remix = "";
-  if (c.indexOf(" ") != -1 && c.length() > 16) 
+  if (c.indexOf(" ") != -1 && c.length() > 16)
     db = true;
 
   if (db)
-    werd = c.substring(1, c.indexOf(" "));
+    werd = c.substring(0, c.indexOf(" "));
   else
-    werd = c.substring(1, c.length());
+    werd = c;
 
   int e;
   if (werd.length() % 2 == 1)
-    e = 1+(15 - werd.length())/2;
+    e = 1 + (15 - werd.length()) / 2;
   else
-    e = (16 - werd.length())/2;
+    e = (16 - werd.length()) / 2;
 
-  for (int i=0; i<e; i++)
-    remix.concat(" "); 
+  for (int i = 0; i < e; i++)
+    remix.concat(" ");
   remix.concat(werd);
 
   if (db) {
-    for (int i=0; i<(16-werd.length()-e); i++)
-      remix.concat(" "); 
-    werd = c.substring(c.indexOf(" ")+1, c.length());
+    for (int i = 0; i < (16 - werd.length() - e); i++)
+      remix.concat(" ");
+    werd = c.substring(c.indexOf(" ") + 1, c.length());
     if (werd.length() % 2 == 1)
-      e = 1+(15 - werd.length())/2;
+      e = 1 + (15 - werd.length()) / 2;
     else
-      e = (16 - werd.length())/2;  
+      e = (16 - werd.length()) / 2;
 
-    for (int i=0; i<e; i++)
-      remix.concat(" "); 
-    remix.concat(werd);   
+    for (int i = 0; i < e; i++)
+      remix.concat(" ");
+    remix.concat(werd);
   }
-  return remix.toUpperCase();
+  remix.toUpperCase();
+  return remix;
 }
+
 //extern void *__bss_end;
 //extern void *__brkval;
 //
