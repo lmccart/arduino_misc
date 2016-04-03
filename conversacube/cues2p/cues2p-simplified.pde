@@ -58,10 +58,10 @@ void handleCueOut() {
   mySerial1.print(0xFE, BYTE);
   mySerial1.print(0x01, BYTE);
 
-  // prepare cue
+  // prepare cue for display
   remixCue(cues[cur_cue]).toCharArray(cue_chars, sizeof(cue_chars));
 
-  // print cue
+  // display cue
   if (cur_user) mySerial0.print(cue_chars);
   else mySerial1.print(cue_chars);
 }
@@ -69,6 +69,9 @@ void handleCueOut() {
 String werd = String(34);
 String remix = String(34);
 boolean db;
+
+// This function adds padding to properly print cues that need to break over two lines.
+// This might need to change based on size and spec of screens used.
 
 String remixCue(String c) {
   db = false;
